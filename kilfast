@@ -2,8 +2,7 @@
   BASIT KILL AURA - Her şeyi parçala (BreakJoints)
   - Sadece aç/kapa butonu
   - Mesafe sabit 30
-  - Tüm modelleri parçalar (oyuncular, NPC'ler, nesneler)
-  - Xeno'da çalıştır (Local)
+  - Tüm modelleri parçalar
 ]=]
 
 local Players = game:GetService("Players")
