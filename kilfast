@@ -1,92 +1,59 @@
 --[=[
-  TAKİP EDEN HASAR TOPU
-  - Etrafında dönen bir top sana takılır
-  - Değdiği her canlıya hasar verir
-  - Basit ve etkili
+  EVRENSEL KILL AURA (DENEYSEL)
+  - Her frame'de etraftaki tüm modelleri parçalar
+  - Can sistemini atlar, direkt modeli yok eder
+  - Bazı oyunlarda çalışmayabilir (server-side koruma)
 ]=]
 
 local Players = game:GetService("Players")
-local lp = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local lp = Players.LocalPlayer
 
--- GUI (basit)
+-- GUI
 local gui = Instance.new("ScreenGui")
-gui.Name = "DamageBall"
+gui.Name = "UniversalKillAura"
 gui.Parent = lp:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
 
 local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0, 120, 0, 40)
-btn.Position = UDim2.new(0.5, -60, 0.5, -20)
-btn.Text = "TOPU AÇ"
+btn.Size = UDim2.new(0, 150, 0, 40)
+btn.Position = UDim2.new(0.5, -75, 0.5, -20)
+btn.Text = "AURA AÇ"
+btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+btn.TextColor3 = Color3.fromRGB(255,255,255)
 btn.Parent = gui
 btn.Draggable = true
 
 local active = false
-local ball = nil
 
-local function createBall()
-    local char = lp.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-    if not root then return end
-    
-    ball = Instance.new("Part")
-    ball.Size = Vector3.new(3, 3, 3)
-    ball.Shape = Enum.PartType.Ball
-    ball.BrickColor = BrickColor.new("Really red")
-    ball.Material = Enum.Material.Neon
-    ball.CanCollide = false
-    ball.Anchored = false
-    ball.Position = root.Position + Vector3.new(0, 3, 0)
-    ball.Parent = workspace
-    
-    -- Fizik motoru
-    local bodyGyro = Instance.new("BodyGyro")
-    bodyGyro.MaxTorque = Vector3.new(0, 40000, 0)
-    bodyGyro.P = 20000
-    bodyGyro.D = 100
-    bodyGyro.Parent = ball
-    
-    local bodyPosition = Instance.new("BodyPosition")
-    bodyPosition.MaxForce = Vector3.new(40000, 40000, 40000)
-    bodyPosition.P = 20000
-    bodyPosition.D = 100
-    bodyPosition.Parent = ball
-    
-    -- Takip et
-    RunService.Heartbeat:Connect(function()
-        if ball and ball.Parent and char and root then
-            bodyPosition.Position = root.Position + Vector3.new(0, 5, 0)
-            bodyGyro.CFrame = root.CFrame
-        end
-    end)
-    
-    -- Değdiğine hasar ver
-    ball.Touched:Connect(function(hit)
-        if not active then return end
-        local model = hit.Parent
-        if model == char then return end
-        local hum = model:FindFirstChildOfClass("Humanoid")
-        if hum and hum.Health > 0 then
-            hum.Health = hum.Health - 20
-        else
-            -- Alternatif health değerleri
-            for _, child in ipairs(model:GetChildren()) do
-                if child:IsA("NumberValue") and child.Name:lower():find("health") then
-                    child.Value = child.Value - 20
+local function loop()
+    while active do
+        local char = lp.Character
+        if char then
+            local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("Head")
+            if root then
+                local pos = root.Position
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if obj:IsA("Model") and obj ~= char then
+                        local ref = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("Head") or obj:FindFirstChildOfClass("Part")
+                        if ref then
+                            local dist = (pos - ref.Position).Magnitude
+                            if dist < 30 then
+                                pcall(function() obj:BreakJoints() end)
+                                pcall(function() obj:Destroy() end)
+                            end
+                        end
+                    end
                 end
             end
         end
-    end)
+        RunService.Heartbeat:Wait()
+    end
 end
 
 btn.MouseButton1Click:Connect(function()
     active = not active
-    if active then
-        btn.Text = "TOPU KAPAT"
-        if not ball then createBall() end
-    else
-        btn.Text = "TOPU AÇ"
-        if ball then ball:Destroy() ball = nil end
-    end
+    btn.Text = active and "AURA KAPAT" or "AURA AÇ"
+    if active then coroutine.wrap(loop)() end
 end)
