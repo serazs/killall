@@ -1,25 +1,24 @@
 --[=[
-  ULTIMATE KILL AURA
-  - Tüm canlıları öldürür (oyuncular, NPC'ler, moblar)
-  - Garantili öldürme (Humanoid, Health değeri, BreakJoints)
-  - Basit arayüz: aç/kapa + mesafe slider
-  - GitHub'a koymak için hazır
+  ULTIMATE KILL AURA - Her Türlü Can Sistemini Sıfırlar
+  - Humanoid, Health değerleri (farklı isimlerde), Attribute, BreakJoints, Silme
+  - Aç/Kapa butonu + Mesafe slider
+  - Performans için 0.1 sn aralık
 ]=]
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local lp = Players.LocalPlayer
 
--- GUI
+-- GUI (sade ama işlevsel)
 local gui = Instance.new("ScreenGui")
 gui.Name = "UltimateKillAura"
 gui.Parent = lp:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 130)
-frame.Position = UDim2.new(0.5, -110, 0.5, -65)
-frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+frame.Size = UDim2.new(0, 240, 0, 140)
+frame.Position = UDim2.new(0.5, -120, 0.5, -70)
+frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 frame.Active = true
 frame.Draggable = true
 frame.Parent = gui
@@ -31,7 +30,7 @@ corner.Parent = frame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 35)
 title.Text = "ULTIMATE KILL"
-title.TextColor3 = Color3.fromRGB(255, 50, 50)
+title.TextColor3 = Color3.fromRGB(255, 0, 0)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
@@ -64,7 +63,7 @@ sliderCorner.Parent = sliderBg
 
 local sliderFill = Instance.new("Frame")
 sliderFill.Size = UDim2.new(0.5, 0, 1, 0)
-sliderFill.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+sliderFill.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 sliderFill.BorderSizePixel = 0
 sliderFill.Parent = sliderBg
 
@@ -87,7 +86,7 @@ local active = false
 local range = 25
 local dragging = false
 
--- Slider
+-- Slider olayları
 sliderBg.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
@@ -112,48 +111,89 @@ sliderBg.InputEnded:Connect(function(input)
     end
 end)
 
--- Öldürme fonksiyonu (çok yönlü)
-local function killEverythingInRange()
-    local char = lp.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("Head")
-    if not root then return end
-    local pos = root.Position
+-- ==================== ÖLDÜRME FONKSİYONU (ÇOK YÖNLÜ) ====================
+local function tryKill(target, distance)
+    -- 1. Humanoid kontrolü (klasik)
+    local hum = target:FindFirstChildOfClass("Humanoid")
+    if hum and hum.Health > 0 then
+        hum.Health = 0
+    end
 
-    -- Workspace'teki tüm modelleri tara
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj ~= char then
-            -- Mesafe için bir referans bul
-            local ref = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("Head") or obj:FindFirstChildOfClass("Part")
-            if ref then
-                local dist = (pos - ref.Position).Magnitude
-                if dist <= range then
-                    -- 1. Humanoid varsa öldür
-                    local hum = obj:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        hum.Health = 0
-                    end
-                    
-                    -- 2. Tüm Health değerlerini sıfırla
-                    for _, val in ipairs(obj:GetDescendants()) do
-                        if val:IsA("NumberValue") and (val.Name == "Health" or string.find(val.Name, "Health")) then
-                            val.Value = 0
-                        end
-                    end
-                    
-                    -- 3. Modeli parçala (BreakJoints)
-                    pcall(function() obj:BreakJoints() end)
+    -- 2. Farklı isimlerdeki NumberValue/IntValue'ları sıfırla
+    local healthNames = {"Health", "HP", "Hp", "hp", "Life", "life", "Can", "can", "Vida", "vida", "Saúde", "HealthValue", "HpValue"}
+    for _, name in ipairs(healthNames) do
+        local val = target:FindFirstChild(name)
+        if val and (val:IsA("NumberValue") or val:IsA("IntValue")) and val.Value > 0 then
+            val.Value = 0
+        end
+    end
+
+    -- 3. StringValue içinde sayı varsa dene (bazı oyunlar string saklar)
+    for _, child in ipairs(target:GetChildren()) do
+        if child:IsA("StringValue") then
+            local num = tonumber(child.Value)
+            if num and num > 0 then
+                child.Value = "0"
+            end
+        end
+    end
+
+    -- 4. Attribute kontrolü (roblox'un yeni sistemi)
+    for _, attrName in ipairs(target:GetAttributes()) do
+        local attrValue = target:GetAttribute(attrName)
+        if type(attrValue) == "number" and attrValue > 0 then
+            if string.find(string.lower(attrName), "health") or string.find(string.lower(attrName), "hp") or string.find(string.lower(attrName), "can") then
+                target:SetAttribute(attrName, 0)
+            end
+        end
+    end
+
+    -- 5. BreakJoints ile modeli parçala
+    pcall(function() target:BreakJoints() end)
+
+    -- 6. İçindeki tüm partları ve modelleri de dene (derinlemesine)
+    for _, descendant in ipairs(target:GetDescendants()) do
+        if descendant:IsA("Model") then
+            tryKill(descendant, distance)  -- recursive
+        elseif descendant:IsA("Part") or descendant:IsA("MeshPart") then
+            -- Part üzerinde health değeri var mı?
+            for _, name in ipairs(healthNames) do
+                local val = descendant:FindFirstChild(name)
+                if val and (val:IsA("NumberValue") or val:IsA("IntValue")) and val.Value > 0 then
+                    val.Value = 0
                 end
             end
         end
     end
+
+    -- 7. En son çare: modeli yok et (bazı oyunlarda işe yarar)
+    pcall(function() target:Destroy() end)
 end
 
--- Döngü
+-- Ana döngü
 local function loop()
     while active do
-        killEverythingInRange()
-        task.wait(0.1)  -- 0.1 saniyede bir kontrol (kasma yapmaz)
+        local char = lp.Character
+        if char then
+            local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("Head")
+            if root then
+                local pos = root.Position
+                -- Tüm modelleri tara
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if obj:IsA("Model") and obj ~= char then
+                        -- Mesafe için bir referans bul
+                        local ref = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("Head") or obj:FindFirstChildOfClass("Part")
+                        if ref then
+                            local dist = (pos - ref.Position).Magnitude
+                            if dist <= range then
+                                tryKill(obj, dist)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(0.1)  -- 0.1 saniye bekle (kasma yapmaz)
     end
 end
 
@@ -162,7 +202,7 @@ btn.MouseButton1Click:Connect(function()
     active = not active
     if active then
         btn.Text = "AURA KAPAT"
-        btn.BackgroundColor3 = Color3.fromRGB(100, 20, 20)
+        btn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
         coroutine.wrap(loop)()
     else
         btn.Text = "AURA AÇ"
@@ -173,6 +213,6 @@ end)
 -- Bildirim
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Ultimate Kill Aura",
-    Text = "Tüm canlıları öldürür",
-    Duration = 4
+    Text = "Her türlü can sistemini dener",
+    Duration = 5
 })
