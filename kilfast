@@ -1,8 +1,9 @@
 --[=[
-  HER ŞEYİ ÖLDÜREN KILL AURA (Oyuncular + NPC'ler)
-  - Aç/kapa butonu
-  - Mesafe ayarı
-  - Tüm canlıları öldürür
+  ULTIMATE KILL AURA
+  - Tüm canlıları öldürür (oyuncular, NPC'ler, moblar)
+  - Garantili öldürme (Humanoid, Health değeri, BreakJoints)
+  - Basit arayüz: aç/kapa + mesafe slider
+  - GitHub'a koymak için hazır
 ]=]
 
 local Players = game:GetService("Players")
@@ -11,26 +12,26 @@ local lp = Players.LocalPlayer
 
 -- GUI
 local gui = Instance.new("ScreenGui")
-gui.Name = "KillAll"
+gui.Name = "UltimateKillAura"
 gui.Parent = lp:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 120)
-frame.Position = UDim2.new(0.5, -100, 0.5, -60)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.Size = UDim2.new(0, 220, 0, 130)
+frame.Position = UDim2.new(0.5, -110, 0.5, -65)
+frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 frame.Active = true
 frame.Draggable = true
 frame.Parent = gui
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
+corner.CornerRadius = UDim.new(0, 10)
 corner.Parent = frame
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "KILL ALL"
-title.TextColor3 = Color3.fromRGB(255, 0, 0)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.Text = "ULTIMATE KILL"
+title.TextColor3 = Color3.fromRGB(255, 50, 50)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
@@ -40,7 +41,7 @@ local btn = Instance.new("TextButton")
 btn.Size = UDim2.new(0.8, 0, 0, 35)
 btn.Position = UDim2.new(0.1, 0, 0.35, 0)
 btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-btn.Text = "AÇ"
+btn.Text = "AURA AÇ"
 btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 btn.Font = Enum.Font.GothamBold
 btn.TextSize = 14
@@ -50,10 +51,10 @@ local btnCorner = Instance.new("UICorner")
 btnCorner.CornerRadius = UDim.new(0, 6)
 btnCorner.Parent = btn
 
--- Mesafe slider
+-- Slider
 local sliderBg = Instance.new("Frame")
 sliderBg.Size = UDim2.new(0.8, 0, 0, 20)
-sliderBg.Position = UDim2.new(0.1, 0, 0.7, 0)
+sliderBg.Position = UDim2.new(0.1, 0, 0.75, 0)
 sliderBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 sliderBg.Parent = frame
 
@@ -63,7 +64,7 @@ sliderCorner.Parent = sliderBg
 
 local sliderFill = Instance.new("Frame")
 sliderFill.Size = UDim2.new(0.5, 0, 1, 0)
-sliderFill.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
 sliderFill.BorderSizePixel = 0
 sliderFill.Parent = sliderBg
 
@@ -111,25 +112,37 @@ sliderBg.InputEnded:Connect(function(input)
     end
 end)
 
--- Öldürme fonksiyonu
-local function killAll()
+-- Öldürme fonksiyonu (çok yönlü)
+local function killEverythingInRange()
     local char = lp.Character
     if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("Head")
     if not root then return end
     local pos = root.Position
-    
-    -- Tüm modelleri tara
+
+    -- Workspace'teki tüm modelleri tara
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("Model") and obj ~= char then
-            local hum = obj:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                local objRoot = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("Head") or obj:FindFirstChildOfClass("Part")
-                if objRoot then
-                    local dist = (pos - objRoot.Position).Magnitude
-                    if dist <= range then
+            -- Mesafe için bir referans bul
+            local ref = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("Head") or obj:FindFirstChildOfClass("Part")
+            if ref then
+                local dist = (pos - ref.Position).Magnitude
+                if dist <= range then
+                    -- 1. Humanoid varsa öldür
+                    local hum = obj:FindFirstChildOfClass("Humanoid")
+                    if hum then
                         hum.Health = 0
                     end
+                    
+                    -- 2. Tüm Health değerlerini sıfırla
+                    for _, val in ipairs(obj:GetDescendants()) do
+                        if val:IsA("NumberValue") and (val.Name == "Health" or string.find(val.Name, "Health")) then
+                            val.Value = 0
+                        end
+                    end
+                    
+                    -- 3. Modeli parçala (BreakJoints)
+                    pcall(function() obj:BreakJoints() end)
                 end
             end
         end
@@ -139,8 +152,8 @@ end
 -- Döngü
 local function loop()
     while active do
-        killAll()
-        task.wait(0.1)
+        killEverythingInRange()
+        task.wait(0.1)  -- 0.1 saniyede bir kontrol (kasma yapmaz)
     end
 end
 
@@ -148,18 +161,18 @@ end
 btn.MouseButton1Click:Connect(function()
     active = not active
     if active then
-        btn.Text = "KAPAT"
-        btn.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
+        btn.Text = "AURA KAPAT"
+        btn.BackgroundColor3 = Color3.fromRGB(100, 20, 20)
         coroutine.wrap(loop)()
     else
-        btn.Text = "AÇ"
+        btn.Text = "AURA AÇ"
         btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     end
 end)
 
 -- Bildirim
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Kill All",
-    Text = "Oyuncular ve NPC'ler ölür",
+    Title = "Ultimate Kill Aura",
+    Text = "Tüm canlıları öldürür",
     Duration = 4
 })
